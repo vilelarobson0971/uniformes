@@ -1,980 +1,316 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PMOC - Plano de Manutenção, Operação e Controle - AKR Brands</title>
-  <meta name="description" content="Sistema de Controle de Manutenção Preventiva PMOC - AKR Brands">
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
-    @media print {
-      .no-print { display: none !important; }
-      .print-only { display: block !important; }
-      body { background: white !important; color: black !important; }
-      @page { size: A4 landscape; margin: 10mm; }
-    }
-    .print-only { display: none; }
-  </style>
-<script src="/_aistudio-iframe.js?v=2c34bde1"></script></head>
-<body class="bg-slate-50 text-slate-900 antialiased min-h-screen flex flex-col">
+import React, { useState, useEffect } from 'react';
+import { X, ArrowUpRight, AlertCircle, Clock, Truck, ShieldCheck, Plus } from 'lucide-react';
+import { UniformItem, StockMovement } from '../types/uniform';
 
-  <!-- TOP HEADER -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs no-print">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16 sm:h-20">
-        <div class="flex items-center space-x-3.5">
-          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-cyan-500/20">
-            <span class="text-xl">❄️</span>
-          </div>
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                PMOC <span class="text-cyan-600 font-extrabold">AKR Brands</span>
-              </span>
-              <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
-                HTML Standalone
-              </span>
-            </div>
-            <p class="text-xs text-slate-500 hidden sm:block">
-              Plano de Manutenção, Operação e Controle • Climatização & Refrigeração
-            </p>
-          </div>
-        </div>
+interface EntryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  items: UniformItem[];
+  preselectedItem?: UniformItem;
+  onOpenNewItem: () => void;
+  onRegisterEntry: (params: {
+    itemId: string;
+    quantity: number;
+    employeeReceiver: string;
+    employeeDispatcher: string;
+    timestamp?: string;
+    reason: string;
+    documentRef?: string;
+    notes?: string;
+  }) => StockMovement;
+}
 
-        <div class="flex items-center space-x-2 sm:space-x-3">
-          <button id="btn-db-status" onclick="openModal('settings-modal')" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 transition-colors">
-            <span id="dot-db-status" class="w-2 h-2 rounded-full bg-amber-500"></span>
-            <span id="txt-db-status">Cloudflare D1 / Local</span>
-          </button>
+export const EntryModal: React.FC<EntryModalProps> = ({
+  isOpen,
+  onClose,
+  items,
+  preselectedItem,
+  onOpenNewItem,
+  onRegisterEntry,
+}) => {
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(5);
+  const [employeeReceiver, setEmployeeReceiver] = useState<string>(() => {
+    return localStorage.getItem('last_dispatcher_name') || 'Almoxarifado Central';
+  });
+  const [supplierOrDispatcher, setSupplierOrDispatcher] = useState<string>('Fornecedor de Uniformes');
+  const [dateTime, setDateTime] = useState<string>('');
+  const [reason, setReason] = useState<string>('Compra / Reposição de estoque');
+  const [documentRef, setDocumentRef] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
-          <button onclick="openModal('sql-modal')" class="hidden md:flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition-colors">
-            <i data-lucide="database" class="w-3.5 h-3.5 text-amber-600"></i>
-            <span>Script SQL Cloudflare D1</span>
-          </button>
-
-          <button onclick="openModal('csv-modal')" class="flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-lg border border-cyan-200 transition-colors">
-            <i data-lucide="upload-cloud" class="w-3.5 h-3.5 text-cyan-600"></i>
-            <span class="hidden sm:inline">Subir Histórico CSV</span>
-          </button>
-
-          <button onclick="openReportModal()" class="flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors">
-            <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500"></i>
-            <span>Relatório PDF</span>
-          </button>
-
-          <button onclick="openDeviceModal()" class="flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 rounded-lg shadow-sm transition-all">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span class="hidden xs:inline">Novo Aparelho</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- MAIN CONTAINER -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
-    <!-- Banner de Boas-Vindas -->
-    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-950 text-white rounded-2xl p-5 sm:p-7 shadow-sm relative overflow-hidden no-print">
-      <div class="relative z-10 max-w-3xl space-y-2">
-        <div class="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-semibold border border-cyan-500/30">
-          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-          <span>PMOC Portaria 3.523/MS &amp; Lei Federal 13.589/2018</span>
-        </div>
-        <h1 class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight">
-          Controle de Manutenção Preventiva e Climatização
-        </h1>
-        <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-          Arquivo HTML único autônomo. Pode ser executado com duplo clique no navegador, hospedado no GitHub Pages ou Cloudflare Pages com banco no Supabase.
-        </p>
-      </div>
-    </div>
-
-    <!-- DASHBOARD STATS -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 no-print">
-      <div onclick="filterByStatus('Todos')" class="bg-white p-4 rounded-xl border border-slate-200 cursor-pointer hover:shadow-md transition-all">
-        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">Total Aparelhos</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <span id="stat-total" class="text-2xl sm:text-3xl font-extrabold text-slate-900">0</span>
-          <span class="text-xs text-slate-500">unidades</span>
-        </div>
-      </div>
-
-      <div onclick="filterByStatus('em_dia')" class="bg-white p-4 rounded-xl border border-slate-200 cursor-pointer hover:shadow-md transition-all">
-        <div class="flex items-center justify-between text-xs font-semibold text-emerald-600 uppercase">Em Dia</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <span id="stat-emdia" class="text-2xl sm:text-3xl font-extrabold text-emerald-700">0</span>
-          <span id="stat-emdia-pct" class="text-xs font-semibold text-emerald-600">0%</span>
-        </div>
-      </div>
-
-      <div onclick="filterByStatus('vencendo')" class="bg-white p-4 rounded-xl border border-slate-200 cursor-pointer hover:shadow-md transition-all">
-        <div class="flex items-center justify-between text-xs font-semibold text-amber-600 uppercase">Vencendo (≤30d)</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <span id="stat-vencendo" class="text-2xl sm:text-3xl font-extrabold text-amber-700">0</span>
-          <span class="text-xs text-amber-700">em breve</span>
-        </div>
-      </div>
-
-      <div onclick="filterByStatus('atrasada')" class="bg-white p-4 rounded-xl border border-slate-200 cursor-pointer hover:shadow-md transition-all">
-        <div class="flex items-center justify-between text-xs font-semibold text-red-600 uppercase">Atrasadas</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <span id="stat-atrasadas" class="text-2xl sm:text-3xl font-extrabold text-red-700">0</span>
-          <span class="text-xs font-semibold text-red-700">Ação requerida</span>
-        </div>
-      </div>
-
-      <div class="col-span-2 lg:col-span-1 bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-xl border border-slate-700">
-        <div class="text-xs font-semibold text-cyan-400 uppercase">Carga Térmica</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <span id="stat-btu" class="text-2xl font-extrabold text-white">0</span>
-          <span class="text-xs text-cyan-300 font-bold">BTU/h</span>
-        </div>
-        <div class="mt-1 text-xs text-slate-300">
-          Equiv: <span id="stat-tr" class="text-cyan-200 font-bold">~0 TR</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- TABELA E FILTROS -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden no-print">
-      <div class="p-4 sm:p-5 border-b border-slate-200 space-y-3.5 bg-slate-50/50">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div class="relative flex-1">
-            <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar por TAG, Setor, Marca, Modelo, Técnico ou Observação..." class="w-full pl-4 pr-4 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500">
-          </div>
-          <div class="flex items-center space-x-2">
-            <button onclick="exportToCsv()" class="flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors">
-              <i data-lucide="download" class="w-3.5 h-3.5 text-slate-500"></i>
-              <span>Exportar CSV</span>
-            </button>
-            <button onclick="resetFilters()" class="flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors">
-              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-              <span>Limpar</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
-          <div>
-            <label class="block text-slate-600 font-medium mb-1">Localidade</label>
-            <select id="filter-local" onchange="renderTable()" class="w-full py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg text-slate-800">
-              <option value="Todos">Todos os Locais</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-slate-600 font-medium mb-1">Setor</label>
-            <select id="filter-setor" onchange="renderTable()" class="w-full py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg text-slate-800">
-              <option value="Todos">Todos os Setores</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-slate-600 font-medium mb-1">Marca</label>
-            <select id="filter-marca" onchange="renderTable()" class="w-full py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg text-slate-800">
-              <option value="Todos">Todas as Marcas</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-slate-600 font-medium mb-1">Status Manutenção</label>
-            <select id="filter-status" onchange="renderTable()" class="w-full py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg text-slate-800">
-              <option value="Todos">Todos os Status</option>
-              <option value="em_dia">Em Dia</option>
-              <option value="vencendo">Vencendo (≤30d)</option>
-              <option value="atrasada">Atrasadas</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm border-collapse">
-          <thead>
-            <tr class="bg-slate-100/70 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-              <th class="py-3 px-4 w-16">TAG</th>
-              <th class="py-3 px-4">Local / Setor</th>
-              <th class="py-3 px-4">Equipamento</th>
-              <th class="py-3 px-4 text-right">Capacidade</th>
-              <th class="py-3 px-4">Última Manut.</th>
-              <th class="py-3 px-4">Próxima Manutenção</th>
-              <th class="py-3 px-4">Resp. Técnico</th>
-              <th class="py-3 px-4 text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="table-body" class="divide-y divide-slate-200 bg-white">
-            <!-- Renderizado via JS -->
-          </tbody>
-        </table>
-      </div>
-
-      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-        <div id="table-count">Carregando registros...</div>
-        <div class="flex items-center space-x-3">
-          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Em dia</span>
-          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Vence em ≤30d</span>
-          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Atrasada</span>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <!-- MODAL: REGISTRAR MANUTENÇÃO -->
-  <div id="maintenance-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto">
-      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-        <h3 class="text-base font-bold text-slate-900" id="maint-title">Registrar Manutenção Preventiva</h3>
-        <button onclick="closeModal('maintenance-modal')" class="p-1 text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <form onsubmit="handleSaveMaintenance(event)" class="p-5 space-y-4 text-sm">
-        <input type="hidden" id="maint-tag">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Execução *</label>
-            <input type="date" id="maint-date" required class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm" onchange="updateMaintNextDate()">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Periodicidade</label>
-            <select id="maint-period" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm" onchange="updateMaintNextDate()">
-              <option value="180">Semestral (180 dias - PMOC)</option>
-              <option value="90">Trimestral (90 dias)</option>
-              <option value="30">Mensal (30 dias)</option>
-              <option value="365">Anual (365 dias)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex justify-between font-medium">
-          <span>Próxima Manutenção Calculada:</span>
-          <span id="maint-calculated-next" class="font-bold font-mono">--/--/----</span>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Técnico Executante *</label>
-            <select id="maint-tech" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm">
-              <option value="Guilherme">Guilherme</option>
-              <option value="Ismael">Ismael</option>
-              <option value="Robson">Robson</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Supervisor</label>
-            <input type="text" id="maint-sup" value="Ismael" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Observações da Execução</label>
-          <textarea id="maint-obs" rows="2" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm" placeholder="Efetuado limpeza e higienização geral..."></textarea>
-        </div>
-
-        <div class="pt-3 border-t border-slate-200 flex justify-end space-x-2">
-          <button type="button" onclick="closeModal('maintenance-modal')" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg">Cancelar</button>
-          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg shadow-sm">Confirmar Manutenção</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: NOVO / EDITAR APARELHO -->
-  <div id="device-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto">
-      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-        <h3 class="text-base font-bold text-slate-900" id="dev-modal-title">Equipamento PMOC</h3>
-        <button onclick="closeModal('device-modal')" class="p-1 text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <form onsubmit="handleSaveDevice(event)" class="p-5 space-y-4 text-sm">
-        <input type="hidden" id="dev-is-edit" value="0">
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">TAG *</label>
-            <input type="number" id="dev-tag" required class="w-full py-2 px-3 border border-slate-300 rounded-lg font-mono font-bold text-sm">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Local *</label>
-            <select id="dev-local" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm">
-              <option value="Matriz">Matriz</option>
-              <option value="Filial">Filial</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Setor / Sala *</label>
-            <input type="text" id="dev-setor" required placeholder="Ex: CPD" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Marca *</label>
-            <input type="text" id="dev-marca" required placeholder="Ex: Springer" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Modelo</label>
-            <input type="text" id="dev-modelo" placeholder="Ex: 42MACB18S5" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm font-mono">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Capacidade (BTU)</label>
-            <select id="dev-btu" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm">
-              <option value="12000">12.000 BTU</option>
-              <option value="18000">18.000 BTU</option>
-              <option value="24000">24.000 BTU</option>
-              <option value="30000">30.000 BTU</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Observações</label>
-          <textarea id="dev-obs" rows="2" class="w-full py-2 px-3 border border-slate-300 rounded-lg text-sm" placeholder="Detalhes..."></textarea>
-        </div>
-
-        <div class="pt-3 border-t border-slate-200 flex justify-end space-x-2">
-          <button type="button" onclick="closeModal('device-modal')" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg">Cancelar</button>
-          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg shadow-sm">Salvar Equipamento</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: SUBIR CSV -->
-  <div id="csv-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto">
-      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-        <h3 class="text-base font-bold text-slate-900">Subir Histórico CSV</h3>
-        <button onclick="closeModal('csv-modal')" class="p-1 text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <div class="p-5 space-y-4 text-sm">
-        <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 cursor-pointer" onclick="document.getElementById('csv-file-input').click()">
-          <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCsvFileSelected(event)">
-          <i data-lucide="file-spreadsheet" class="w-10 h-10 text-cyan-600 mx-auto mb-2"></i>
-          <p class="font-bold text-slate-800">Clique para selecionar o arquivo .CSV</p>
-          <p class="text-xs text-slate-500 mt-1">Carregue o histórico antigo sem perder registros</p>
-        </div>
-
-        <div class="flex justify-between items-center pt-2">
-          <button onclick="restoreInitial50()" class="text-xs font-semibold text-cyan-700 hover:underline">
-            Carregar 50 registros padrão AKR Brands
-          </button>
-          <button onclick="closeModal('csv-modal')" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: BANCO DE DADOS & CLOUDFLARE D1 -->
-  <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto">
-      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-        <div class="flex items-center space-x-2">
-          <i data-lucide="database" class="w-5 h-5 text-amber-600"></i>
-          <h3 class="text-base font-bold text-slate-900">Banco de Dados Cloudflare D1</h3>
-        </div>
-        <button onclick="closeModal('settings-modal')" class="p-1 text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <div class="p-5 space-y-4 text-sm">
-        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
-          <p class="font-bold">O Cloudflare D1 é o banco SQL nativo da própria Cloudflare!</p>
-          <p class="text-slate-700">Ele não requer chaves públicas no frontend. O Cloudflare Pages conecta automaticamente através de <code class="font-mono font-bold text-amber-900">/api/devices</code>.</p>
-        </div>
-
-        <div class="space-y-2 text-xs text-slate-700">
-          <span class="font-bold text-slate-900 block">Passos rápidos na Cloudflare:</span>
-          <ol class="list-decimal pl-5 space-y-1">
-            <li>Crie o banco em <strong>Storage &amp; Databases &gt; D1 SQL Database &gt; Create database</strong> (nome: <strong>pmoc-db</strong>).</li>
-            <li>No seu projeto do Pages, vincule o banco em <strong>Settings &gt; Functions &gt; D1 bindings</strong> (nome: <strong>DB</strong>, banco: <strong>pmoc-db</strong>).</li>
-            <li>Execute o script SQL fornecido na aba Console do D1.</li>
-          </ol>
-        </div>
-
-        <div class="pt-2 border-t border-slate-200 space-y-2">
-          <button onclick="syncLocalToCloudflare()" class="w-full py-2 px-3 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-all flex items-center justify-center space-x-1.5">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            <span>Testar / Sincronizar dados locais com Cloudflare D1</span>
-          </button>
-          <button onclick="openModal('sql-modal'); closeModal('settings-modal');" class="w-full py-2 px-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border flex items-center justify-center space-x-1.5">
-            <i data-lucide="code-2" class="w-3.5 h-3.5 text-slate-500"></i>
-            <span>Ver Script SQL Completo do Cloudflare D1</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: SCRIPT SQL CLOUDFLARE D1 -->
-  <div id="sql-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] flex flex-col">
-      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-        <div class="flex items-center space-x-2">
-          <i data-lucide="code-2" class="w-5 h-5 text-amber-600"></i>
-          <h3 class="text-base font-bold text-slate-900">Script SQL para Cloudflare D1</h3>
-        </div>
-        <button onclick="closeModal('sql-modal')" class="p-1 text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <div class="p-4 flex-1 overflow-hidden flex flex-col">
-        <div class="flex justify-between items-center pb-2 text-xs">
-          <span class="font-mono text-slate-500">schema_cloudflare_d1.sql</span>
-          <button onclick="copyD1Sql()" id="btn-copy-d1" class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded font-semibold text-xs flex items-center gap-1">
-            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-            <span>Copiar Script SQL</span>
-          </button>
-        </div>
-        <div class="flex-1 bg-slate-950 text-slate-200 p-3 rounded-lg overflow-y-auto font-mono text-xs">
-          <pre id="d1-sql-code">CREATE TABLE IF NOT EXISTS pmoc_devices (
-    id TEXT PRIMARY KEY,
-    tag INTEGER UNIQUE NOT NULL,
-    local TEXT NOT NULL,
-    setor TEXT NOT NULL,
-    marca TEXT NOT NULL,
-    modelo TEXT DEFAULT '',
-    btu INTEGER NOT NULL DEFAULT 12000,
-    data_manutencao TEXT,
-    tecnico_executante TEXT DEFAULT 'Guilherme',
-    aprovacao_supervisor TEXT DEFAULT 'Ismael',
-    proxima_manutencao TEXT,
-    observacoes TEXT DEFAULT '',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS pmoc_maintenance_history (
-    id TEXT PRIMARY KEY,
-    device_tag INTEGER NOT NULL,
-    data_manutencao TEXT NOT NULL,
-    proxima_manutencao TEXT NOT NULL,
-    tecnico_executante TEXT NOT NULL,
-    aprovacao_supervisor TEXT DEFAULT 'Ismael',
-    observacoes TEXT DEFAULT '',
-    checklist TEXT DEFAULT '{}',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (device_tag) REFERENCES pmoc_devices(tag) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_pmoc_devices_tag ON pmoc_devices(tag);
-CREATE INDEX IF NOT EXISTS idx_pmoc_devices_local ON pmoc_devices(local);
-CREATE INDEX IF NOT EXISTS idx_pmoc_devices_setor ON pmoc_devices(setor);
-CREATE INDEX IF NOT EXISTS idx_pmoc_devices_proxima ON pmoc_devices(proxima_manutencao);
-CREATE INDEX IF NOT EXISTS idx_pmoc_history_tag ON pmoc_maintenance_history(device_tag);</pre>
-        </div>
-      </div>
-      <div class="p-4 border-t border-slate-200 flex justify-end">
-        <button onclick="closeModal('sql-modal')" class="px-4 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg">Fechar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SCRIPT JS DE COMPORTAMENTO -->
-  <script>
-    // Dados iniciais padrão (50 aparelhos AKR Brands)
-    const INITIAL_DATA = [
-      { tag: 1, local: "Matriz", setor: "Recepção", marca: "Springer", modelo: "42MACA12S5", btu: 12000, data_manutencao: "2026-09-24", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-23", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 2, local: "Matriz", setor: "CPD", marca: "Philco", modelo: "Eco Inverter", btu: 12000, data_manutencao: "2026-02-23", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-08-22", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 3, local: "Matriz", setor: "CPD", marca: "Elgin", modelo: "HWFL18B2IA", btu: 18000, data_manutencao: "2026-01-27", tecnico_executante: "Guilherme", aprovacao_supervisor: "Robson", proxima_manutencao: "2026-07-26", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 4, local: "Matriz", setor: "RH", marca: "Springer", modelo: "42MACB18S5", btu: 18000, data_manutencao: "2026-09-24", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-23", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 5, local: "Matriz", setor: "Marketing", marca: "TCL", modelo: "TAC18CSA1", btu: 18000, data_manutencao: "2026-09-24", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-23", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 6, local: "Matriz", setor: "Marketing", marca: "TCL", modelo: "TAC18CSA1", btu: 18000, data_manutencao: "2026-07-30", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-01-26", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 7, local: "Matriz", setor: "Inteligência de mercado", marca: "TCL", modelo: "TAC18CSA1", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 8, local: "Matriz", setor: "Diretoria - Alan", marca: "Springer", modelo: "42MACB18S5", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Feito limpeza e higienização" },
-      { tag: 9, local: "Matriz", setor: "Diretoria - Rafael", marca: "Springer", modelo: "42AFFCL12", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 10, local: "Matriz", setor: "Controladoria", marca: "Springer", modelo: "42MACB18S5", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 11, local: "Matriz", setor: "Diretoria - Jair", marca: "COMFEE", modelo: "42AFCE12X5", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Feito limpeza e higienização" },
-      { tag: 12, local: "Matriz", setor: "Sala reunião térreo", marca: "COMFEE", modelo: "42AFCD18F5", btu: 18000, data_manutencao: "2026-01-27", tecnico_executante: "Guilherme", aprovacao_supervisor: "Robson", proxima_manutencao: "2026-07-26", observacoes: "Feito limpeza e higienização" },
-      { tag: 13, local: "Matriz", setor: "Financeiro", marca: "Springer", modelo: "42MACB18S5", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 14, local: "Matriz", setor: "Diretoria", marca: "Springer", modelo: "42TFCA", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Feito limpeza e higienização" },
-      { tag: 15, local: "Matriz", setor: "Sala reunião principal", marca: "Springer", modelo: "42MACB18S5", btu: 18000, data_manutencao: "2026-01-27", tecnico_executante: "Guilherme", aprovacao_supervisor: "Robson", proxima_manutencao: "2026-07-26", observacoes: "Feito limpeza e higienização" },
-      { tag: 16, local: "Matriz", setor: "Sala reunião principal", marca: "Springer", modelo: "42MACB18S5", btu: 18000, data_manutencao: "2026-01-27", tecnico_executante: "Guilherme", aprovacao_supervisor: "Robson", proxima_manutencao: "2026-07-26", observacoes: "Feito limpeza e higienização" },
-      { tag: 17, local: "Matriz", setor: "Expedição - Recepção", marca: "Philco", modelo: "Eco Inverter", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 18, local: "Matriz", setor: "Expedição - Sala Welder", marca: "Agratto", modelo: "ACST12FR4-02", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado Limpeza e higienização" },
-      { tag: 19, local: "Filial", setor: "Sala de Reunião - Filial 01", marca: "COMFEE", modelo: "42AFCD12F5", btu: 12000, data_manutencao: "2026-01-27", tecnico_executante: "Guilherme", aprovacao_supervisor: "Guilherme", proxima_manutencao: "2026-07-26", observacoes: "Feito Limpeza E Higienização" },
-      { tag: 20, local: "Matriz", setor: "Estoque - Sala Umberto", marca: "GREE", modelo: "GWC12QC-D3NNB4D/I", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Feito limpeza e higienização" },
-      { tag: 21, local: "Matriz", setor: "Laboratório - Sala ADM", marca: "GREE", modelo: "GWC18AAD-D3NNA1D/I", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "efetuado limpeza e higienização" },
-      { tag: 22, local: "Matriz", setor: "Laboratório - Sala ADM", marca: "GREE", modelo: "GWC18AAD-D3NNA1D/I", btu: 18000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "efetuado limpeza e higienização" },
-      { tag: 23, local: "Filial", setor: "Gerência", marca: "GREE", modelo: "GWC12AAC-D3NNB4D/I", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Executado limpeza e higienização" },
-      { tag: 24, local: "Filial", setor: "Modelagem", marca: "GREE", modelo: "GWC12AAC-D3NNB4D/I", btu: 12000, data_manutencao: "2026-09-04", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-03", observacoes: "efetuado limpeza e higienização" },
-      { tag: 25, local: "Filial", setor: "Inteligência do Produto", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-09-04", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-03", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 26, local: "Filial", setor: "Estilo", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-09-04", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-03", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 27, local: "Filial", setor: "Show Room", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-09-04", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-03", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 28, local: "Filial", setor: "T.I.", marca: "Consul", modelo: "", btu: 12000, data_manutencao: "2026-08-04", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-01-31", observacoes: "efetuado limpeza e higienização" },
-      { tag: 29, local: "Filial", setor: "PCP", marca: "Electrolux", modelo: "VI18F", btu: 18000, data_manutencao: "2026-03-02", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-08-29", observacoes: "efetuado limpeza e higienização" },
-      { tag: 30, local: "Filial", setor: "Refeitório - Filial 01", marca: "GREE", modelo: "GWC12QC-D3NNB4D/I", btu: 12000, data_manutencao: "2026-03-02", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-08-29", observacoes: "efetuado limpez e higienização" },
-      { tag: 31, local: "Filial", setor: "Compras", marca: "Philco", modelo: "Eco Inverter", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 32, local: "Filial", setor: "Refeitório", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 33, local: "Filial", setor: "Refeitório", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 34, local: "Filial", setor: "Refeitório", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 35, local: "Filial", setor: "Sala de Reunião", marca: "GREE", modelo: "GWC24QE-D3NNB4D/I", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 36, local: "Matriz", setor: "Estúdio", marca: "Philco", modelo: "", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 37, local: "Matriz", setor: "Estúdio", marca: "Springer", modelo: "", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 38, local: "Matriz", setor: "Refeitório", marca: "Agratto", modelo: "LCS24F-02", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 39, local: "Matriz", setor: "Refeitório", marca: "Agratto", modelo: "LCS24F-02", btu: 24000, data_manutencao: "2026-03-06", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2026-09-02", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 40, local: "Matriz", setor: "e-Commerce", marca: "Consul", modelo: "", btu: 12000, data_manutencao: "2026-09-25", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-24", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 41, local: "Matriz", setor: "Expedição", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" },
-      { tag: 42, local: "Matriz", setor: "Expedição", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" },
-      { tag: 43, local: "Matriz", setor: "Expedição", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" },
-      { tag: 44, local: "Matriz", setor: "Expedição", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" },
-      { tag: 45, local: "Matriz", setor: "Deposito de tecidos", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 46, local: "Matriz", setor: "Deposito de tecidos", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Efetuado limpeza e higienização" },
-      { tag: 47, local: "Matriz", setor: "Depósito Tecidos", marca: "Clima", modelo: "Climatizador", btu: 30000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Efetuado limpeza e higeinização" },
-      { tag: 48, local: "Filial", setor: "Refeitorio - Filial 02", marca: "Gree", modelo: "Eco Inverer", btu: 18000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" },
-      { tag: 49, local: "Filial", setor: "Sala de risco - Filial 02", marca: "Gree", modelo: "Eco Inverer", btu: 18000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" },
-      { tag: 50, local: "Filial", setor: "Sala PCP - Filial 02", marca: "Gree", modelo: "Eco Inverer", btu: 18000, data_manutencao: "2026-09-22", tecnico_executante: "Guilherme", aprovacao_supervisor: "Ismael", proxima_manutencao: "2027-03-21", observacoes: "Realizado limpeza e higienização" }
-    ];
-
-    let devices = [];
-    const STORAGE_KEY = 'pmoc_akr_devices_standalone_v1';
-
-    function loadLocalDevices() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        devices = [...INITIAL_DATA];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
-      } else {
-        try { devices = JSON.parse(raw); } catch (e) { devices = [...INITIAL_DATA]; }
-      }
-    }
-
-    function saveDevices() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
-    }
-
-    function isoToBr(iso) {
-      if (!iso) return '-';
-      const p = iso.split('-');
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
-    }
-
-    function addDays(iso, days) {
-      const [y, m, d] = iso.split('-').map(Number);
-      const dt = new Date(y, m - 1, d);
-      dt.setDate(dt.getDate() + Number(days));
-      const ny = dt.getFullYear();
-      const nm = String(dt.getMonth() + 1).padStart(2, '0');
-      const nd = String(dt.getDate()).padStart(2, '0');
-      return `${ny}-${nm}-${nd}`;
-    }
-
-    function getStatus(proxIso) {
-      if (!proxIso) return { status: 'pendente', label: 'Pendente', badge: 'bg-slate-100 text-slate-700 border-slate-300' };
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const [y, m, d] = proxIso.split('-').map(Number);
-      const target = new Date(y, m - 1, d);
-      target.setHours(0,0,0,0);
-      const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
-      if (diff < 0) return { status: 'atrasada', label: `Vencida (${Math.abs(diff)}d)`, badge: 'bg-red-50 text-red-700 border-red-200' };
-      if (diff <= 30) return { status: 'vencendo', label: `Vence em ${diff}d`, badge: 'bg-amber-50 text-amber-800 border-amber-200' };
-      return { status: 'em_dia', label: `Em dia (${diff}d)`, badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    }
-
-    function updateStats() {
-      let emDia = 0, vencendo = 0, atrasadas = 0, btuTotal = 0;
-      devices.forEach(d => {
-        btuTotal += Number(d.btu) || 0;
-        const s = getStatus(d.proxima_manutencao);
-        if (s.status === 'em_dia') emDia++;
-        else if (s.status === 'vencendo') vencendo++;
-        else if (s.status === 'atrasada') atrasadas++;
-      });
-
-      document.getElementById('stat-total').textContent = devices.length;
-      document.getElementById('stat-emdia').textContent = emDia;
-      document.getElementById('stat-emdia-pct').textContent = devices.length ? `${Math.round((emDia / devices.length) * 100)}%` : '0%';
-      document.getElementById('stat-vencendo').textContent = vencendo;
-      document.getElementById('stat-atrasadas').textContent = atrasadas;
-      document.getElementById('stat-btu').textContent = btuTotal.toLocaleString('pt-BR');
-      document.getElementById('stat-tr').textContent = `~${(btuTotal / 12000).toFixed(1)} TR`;
-    }
-
-    function populateFilterDropdowns() {
-      const locals = [...new Set(devices.map(d => d.local).filter(Boolean))].sort();
-      const setores = [...new Set(devices.map(d => d.setor).filter(Boolean))].sort();
-      const marcas = [...new Set(devices.map(d => d.marca).filter(Boolean))].sort();
-
-      const fLocal = document.getElementById('filter-local');
-      const fSetor = document.getElementById('filter-setor');
-      const fMarca = document.getElementById('filter-marca');
-
-      fLocal.innerHTML = '<option value="Todos">Todos os Locais</option>' + locals.map(l => `<option value="${l}">${l}</option>`).join('');
-      fSetor.innerHTML = '<option value="Todos">Todos os Setores</option>' + setores.map(s => `<option value="${s}">${s}</option>`).join('');
-      fMarca.innerHTML = '<option value="Todos">Todas as Marcas</option>' + marcas.map(m => `<option value="${m}">${m}</option>`).join('');
-    }
-
-    function renderTable() {
-      const search = document.getElementById('search-input').value.toLowerCase().trim();
-      const local = document.getElementById('filter-local').value;
-      const setor = document.getElementById('filter-setor').value;
-      const marca = document.getElementById('filter-marca').value;
-      const status = document.getElementById('filter-status').value;
-
-      const filtered = devices.filter(d => {
-        if (search) {
-          const match = String(d.tag).includes(search) ||
-            d.local.toLowerCase().includes(search) ||
-            d.setor.toLowerCase().includes(search) ||
-            d.marca.toLowerCase().includes(search) ||
-            (d.modelo || '').toLowerCase().includes(search) ||
-            (d.tecnico_executante || '').toLowerCase().includes(search) ||
-            (d.observacoes || '').toLowerCase().includes(search);
-          if (!match) return false;
-        }
-        if (local !== 'Todos' && d.local !== local) return false;
-        if (setor !== 'Todos' && d.setor !== setor) return false;
-        if (marca !== 'Todos' && d.marca !== marca) return false;
-        if (status !== 'Todos') {
-          const st = getStatus(d.proxima_manutencao);
-          if (st.status !== status) return false;
-        }
-        return true;
-      });
-
-      const tbody = document.getElementById('table-body');
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">Nenhum aparelho encontrado.</td></tr>`;
-      } else {
-        tbody.innerHTML = filtered.map(d => {
-          const st = getStatus(d.proxima_manutencao);
-          return `
-            <tr class="hover:bg-cyan-50/30 transition-colors">
-              <td class="py-3 px-4 font-mono font-bold text-slate-900">#${d.tag}</td>
-              <td class="py-3 px-4">
-                <div class="font-semibold text-slate-900">${d.setor}</div>
-                <div class="text-xs text-slate-500">${d.local}</div>
-              </td>
-              <td class="py-3 px-4">
-                <div class="font-medium text-slate-900">${d.marca}</div>
-                <div class="text-xs text-slate-500 font-mono">${d.modelo || '-'}</div>
-              </td>
-              <td class="py-3 px-4 text-right font-mono font-semibold">${Number(d.btu).toLocaleString('pt-BR')} BTU</td>
-              <td class="py-3 px-4 text-xs font-mono">${isoToBr(d.data_manutencao)}</td>
-              <td class="py-3 px-4">
-                <div class="font-semibold text-xs font-mono">${isoToBr(d.proxima_manutencao)}</div>
-                <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-2xs font-semibold border ${st.badge}">${st.label}</span>
-              </td>
-              <td class="py-3 px-4 text-xs">
-                <div>Téc: <strong>${d.tecnico_executante || 'Guilherme'}</strong></div>
-                <div>Sup: <strong>${d.aprovacao_supervisor || 'Ismael'}</strong></div>
-              </td>
-              <td class="py-3 px-4 text-center">
-                <div class="flex items-center justify-center space-x-1.5">
-                  <button onclick="openMaintenanceModal(${d.tag})" class="px-2 py-1 text-xs font-semibold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded border border-cyan-200">
-                    Manutenção
-                  </button>
-                  <button onclick="openEditDevice(${d.tag})" class="p-1 text-slate-500 hover:text-slate-800">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i>
-                  </button>
-                  <button onclick="deleteDevice(${d.tag})" class="p-1 text-slate-400 hover:text-red-600">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
-
-      document.getElementById('table-count').textContent = `Exibindo ${filtered.length} de ${devices.length} aparelhos cadastrados.`;
-      lucide.createIcons();
-      updateStats();
-    }
-
-    function openModal(id) {
-      document.getElementById(id).classList.remove('hidden');
-      document.getElementById(id).classList.add('flex');
-    }
-
-    function closeModal(id) {
-      document.getElementById(id).classList.add('hidden');
-      document.getElementById(id).classList.remove('flex');
-    }
-
-    function resetFilters() {
-      document.getElementById('search-input').value = '';
-      document.getElementById('filter-local').value = 'Todos';
-      document.getElementById('filter-setor').value = 'Todos';
-      document.getElementById('filter-marca').value = 'Todos';
-      document.getElementById('filter-status').value = 'Todos';
-      renderTable();
-    }
-
-    function filterByStatus(st) {
-      document.getElementById('filter-status').value = st;
-      renderTable();
-    }
-
-    function openMaintenanceModal(tag) {
-      const dev = devices.find(d => d.tag === tag);
-      if (!dev) return;
-      document.getElementById('maint-tag').value = tag;
-      document.getElementById('maint-title').textContent = `Registrar Manutenção Preventiva - TAG #${tag} (${dev.setor})`;
+  useEffect(() => {
+    if (isOpen) {
       const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-      document.getElementById('maint-date').value = todayStr;
-      document.getElementById('maint-tech').value = dev.tecnico_executante || 'Guilherme';
-      document.getElementById('maint-sup').value = dev.aprovacao_supervisor || 'Ismael';
-      document.getElementById('maint-obs').value = dev.observacoes || 'Efetuado limpeza e higienização';
-      updateMaintNextDate();
-      openModal('maintenance-modal');
-    }
+      const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setDateTime(localIso);
 
-    function updateMaintNextDate() {
-      const dt = document.getElementById('maint-date').value;
-      const days = document.getElementById('maint-period').value;
-      if (dt) {
-        document.getElementById('maint-calculated-next').textContent = isoToBr(addDays(dt, days));
+      if (preselectedItem) {
+        setSelectedItemId(preselectedItem.id);
+      } else if (items.length > 0 && !selectedItemId) {
+        setSelectedItemId(items[0].id);
       }
+      setQuantity(5);
+      setError(null);
+    }
+  }, [isOpen, preselectedItem, items]);
+
+  if (!isOpen) return null;
+
+  const currentItem = items.find((i) => i.id === selectedItemId);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!selectedItemId) {
+      setError('Selecione o uniforme para dar entrada.');
+      return;
     }
 
-    function handleSaveMaintenance(e) {
-      e.preventDefault();
-      const tag = Number(document.getElementById('maint-tag').value);
-      const dt = document.getElementById('maint-date').value;
-      const days = document.getElementById('maint-period').value;
-      const tech = document.getElementById('maint-tech').value;
-      const sup = document.getElementById('maint-sup').value;
-      const obs = document.getElementById('maint-obs').value;
-
-      const dev = devices.find(d => d.tag === tag);
-      if (dev) {
-        dev.data_manutencao = dt;
-        dev.proxima_manutencao = addDays(dt, days);
-        dev.tecnico_executante = tech;
-        dev.aprovacao_supervisor = sup;
-        dev.observacoes = obs;
-        saveDevices();
-        closeModal('maintenance-modal');
-        renderTable();
-
-        // Envia para o Cloudflare D1 se ativo
-        fetch('/api/maintenance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tag,
-            data_manutencao: dt,
-            proxima_manutencao: dev.proxima_manutencao,
-            tecnico_executante: tech,
-            aprovacao_supervisor: sup,
-            observacoes: obs
-          })
-        }).catch(() => {});
-
-        alert(`Manutenção para TAG #${tag} registrada com sucesso!`);
-      }
+    if (quantity <= 0) {
+      setError('A quantidade adicionada deve ser de no mínimo 1.');
+      return;
     }
 
-    function openDeviceModal() {
-      document.getElementById('dev-is-edit').value = '0';
-      document.getElementById('dev-modal-title').textContent = 'Adicionar Novo Equipamento PMOC';
-      const maxTag = devices.reduce((m, d) => d.tag > m ? d.tag : m, 0);
-      document.getElementById('dev-tag').value = maxTag + 1;
-      document.getElementById('dev-tag').readOnly = false;
-      document.getElementById('dev-setor').value = '';
-      document.getElementById('dev-marca').value = '';
-      document.getElementById('dev-modelo').value = '';
-      document.getElementById('dev-obs').value = '';
-      openModal('device-modal');
+    if (!employeeReceiver.trim()) {
+      setError('Informe o responsável pelo recebimento / conferência.');
+      return;
     }
 
-    function openEditDevice(tag) {
-      const dev = devices.find(d => d.tag === tag);
-      if (!dev) return;
-      document.getElementById('dev-is-edit').value = '1';
-      document.getElementById('dev-modal-title').textContent = `Editar Equipamento TAG #${tag}`;
-      document.getElementById('dev-tag').value = dev.tag;
-      document.getElementById('dev-tag').readOnly = true;
-      document.getElementById('dev-local').value = dev.local || 'Matriz';
-      document.getElementById('dev-setor').value = dev.setor || '';
-      document.getElementById('dev-marca').value = dev.marca || '';
-      document.getElementById('dev-modelo').value = dev.modelo || '';
-      document.getElementById('dev-btu').value = dev.btu || 12000;
-      document.getElementById('dev-obs').value = dev.observacoes || '';
-      openModal('device-modal');
+    try {
+      const isoTimestamp = dateTime ? new Date(dateTime).toISOString() : new Date().toISOString();
+
+      onRegisterEntry({
+        itemId: selectedItemId,
+        quantity,
+        employeeReceiver: employeeReceiver.trim(),
+        employeeDispatcher: supplierOrDispatcher.trim() || 'Fornecedor',
+        timestamp: isoTimestamp,
+        reason: reason.trim(),
+        documentRef: documentRef.trim(),
+        notes: notes.trim(),
+      });
+
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao dar entrada no estoque');
     }
+  };
 
-    function handleSaveDevice(e) {
-      e.preventDefault();
-      const isEdit = document.getElementById('dev-is-edit').value === '1';
-      const tag = Number(document.getElementById('dev-tag').value);
-      const local = document.getElementById('dev-local').value;
-      const setor = document.getElementById('dev-setor').value;
-      const marca = document.getElementById('dev-marca').value;
-      const modelo = document.getElementById('dev-modelo').value;
-      const btu = Number(document.getElementById('dev-btu').value);
-      const obs = document.getElementById('dev-obs').value;
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <ArrowUpRight className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base sm:text-lg">Entrada / Reposição de Uniformes</h3>
+              <p className="text-xs text-emerald-100">Adicionar novos uniformes comprados ao estoque</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-      if (!isEdit && devices.some(d => d.tag === tag)) {
-        alert('Já existe um aparelho com esta TAG!');
-        return;
-      }
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs sm:text-sm flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
-      if (isEdit) {
-        const idx = devices.findIndex(d => d.tag === tag);
-        if (idx >= 0) {
-          devices[idx] = { ...devices[idx], local, setor, marca, modelo, btu, observacoes: obs };
-        }
-      } else {
-        devices.push({
-          tag, local, setor, marca, modelo, btu,
-          data_manutencao: null,
-          proxima_manutencao: null,
-          tecnico_executante: 'Guilherme',
-          aprovacao_supervisor: 'Ismael',
-          observacoes: obs
-        });
-        devices.sort((a,b) => a.tag - b.tag);
-      }
+          {/* Item Selector with Quick Link to New Model */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Uniforme a ser Reabastecido <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenNewItem();
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Cadastrar Novo Modelo</span>
+              </button>
+            </div>
+            <select
+              value={selectedItemId}
+              onChange={(e) => setSelectedItemId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white font-medium"
+            >
+              <option value="">-- Selecione o item --</option>
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} | Tam: {item.size} (Estoque atual: {item.quantity} {item.unit})
+                </option>
+              ))}
+            </select>
+          </div>
 
-      saveDevices();
-      populateFilterDropdowns();
-      closeModal('device-modal');
-      renderTable();
+          {/* Current Stock Preview Card */}
+          {currentItem && (
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+              <div>
+                <span className="font-semibold text-slate-800 block">{currentItem.name} (Tamanho {currentItem.size})</span>
+                <span className="text-slate-500">Estoque atual: <strong>{currentItem.quantity}</strong> {currentItem.unit} (mínimo: {currentItem.minStock})</span>
+              </div>
+              <div className="text-right">
+                <span className="text-emerald-700 font-bold block text-sm">
+                  Novo Saldo Previsto: {currentItem.quantity + (quantity || 0)} {currentItem.unit}
+                </span>
+              </div>
+            </div>
+          )}
 
-      // Envia para o Cloudflare D1
-      fetch('/api/devices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag, local, setor, marca, modelo, btu, observacoes: obs })
-      }).catch(() => {});
-    }
+          {/* Quantity and Reason */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Quantidade Comprada <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700"
+                required
+              />
+            </div>
 
-    function deleteDevice(tag) {
-      if (confirm(`Excluir aparelho TAG #${tag}?`)) {
-        devices = devices.filter(d => d.tag !== tag);
-        saveDevices();
-        populateFilterDropdowns();
-        renderTable();
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Motivo da Entrada
+              </label>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              >
+                <option value="Compra / Reposição de estoque">Compra / Reposição de estoque</option>
+                <option value="Devolução de colaborador">Devolução de colaborador</option>
+                <option value="Ajuste positivo de inventário">Ajuste positivo de inventário</option>
+                <option value="Troca por garantia / defeito">Troca por garantia / defeito</option>
+              </select>
+            </div>
+          </div>
 
-        // Remove no Cloudflare D1
-        fetch(`/api/devices?tag=${tag}`, { method: 'DELETE' }).catch(() => {});
-      }
-    }
+          {/* Dispatcher/Supplier and Receiver */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5 text-slate-500" />
+                <span>Fornecedor / Entregador</span>
+              </label>
+              <input
+                type="text"
+                value={supplierOrDispatcher}
+                onChange={(e) => setSupplierOrDispatcher(e.target.value)}
+                placeholder="Ex: Confecções Alpha Ltda"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              />
+            </div>
 
-    function exportToCsv() {
-      const headers = ['TAG','Local','Setor','Marca','Modelo','BTU','Data Manutenção','Técnico Executante','Aprovação Supervisor','Próxima manutenção','Observações'];
-      const rows = devices.map(d => [
-        d.tag, `"${d.local}"`, `"${d.setor}"`, `"${d.marca}"`, `"${d.modelo||''}"`, d.btu,
-        `"${isoToBr(d.data_manutencao)}"`, `"${d.tecnico_executante||''}"`, `"${d.aprovacao_supervisor||''}"`,
-        `"${isoToBr(d.proxima_manutencao)}"`, `"${d.observacoes||''}"`
-      ]);
-      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pmoc_akr_${new Date().toISOString().slice(0,10)}.csv`;
-      a.click();
-    }
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Quem Conferiu / Recebeu</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={employeeReceiver}
+                onChange={(e) => setEmployeeReceiver(e.target.value)}
+                placeholder="Ex: Carlos (Almoxarifado)"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                required
+              />
+            </div>
+          </div>
 
-    function handleCsvFileSelected(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        const text = evt.target.result;
-        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-        if (lines.length <= 1) { alert('Arquivo CSV vazio ou sem dados.'); return; }
-        const delimiter = lines[0].includes(';') ? ';' : ',';
-        const newDevs = [];
-        for (let i = 1; i < lines.length; i++) {
-          const parts = lines[i].split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ''));
-          const tag = parseInt(parts[0]);
-          if (!isNaN(tag)) {
-            newDevs.push({
-              tag,
-              local: parts[1] || 'Matriz',
-              setor: parts[2] || 'Geral',
-              marca: parts[3] || 'Desconhecida',
-              modelo: parts[4] || '',
-              btu: parseInt(parts[5]) || 12000,
-              data_manutencao: parts[6] ? parts[6].split('/').reverse().join('-') : null,
-              tecnico_executante: parts[7] || 'Guilherme',
-              aprovacao_supervisor: parts[8] || 'Ismael',
-              proxima_manutencao: parts[9] ? parts[9].split('/').reverse().join('-') : null,
-              observacoes: parts[10] || ''
-            });
-          }
-        }
-        if (newDevs.length > 0) {
-          devices = newDevs.sort((a,b) => a.tag - b.tag);
-          saveDevices();
-          populateFilterDropdowns();
-          closeModal('csv-modal');
-          renderTable();
-          alert(`${newDevs.length} registros importados com sucesso!`);
-        }
-      };
-      reader.readAsText(file);
-    }
+          {/* NF and Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Nº Nota Fiscal / Pedido de Compra
+              </label>
+              <input
+                type="text"
+                value={documentRef}
+                onChange={(e) => setDocumentRef(e.target.value)}
+                placeholder="Ex: NF-58291"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
 
-    function restoreInitial50() {
-      if (confirm('Restaurar os 50 aparelhos padrão originais da AKR Brands?')) {
-        devices = [...INITIAL_DATA];
-        saveDevices();
-        populateFilterDropdowns();
-        closeModal('csv-modal');
-        renderTable();
-        alert('50 registros padrão restaurados!');
-      }
-    }
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-500" />
+                <span>Data e Horário Automático</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={dateTime}
+                onChange={(e) => setDateTime(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
 
-    function copyD1Sql() {
-      const code = document.getElementById('d1-sql-code').textContent;
-      navigator.clipboard.writeText(code);
-      const btn = document.getElementById('btn-copy-d1');
-      btn.textContent = 'Copiado!';
-      setTimeout(() => { btn.textContent = 'Copiar Script SQL'; }, 2000);
-    }
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Observações Adicionais
+            </label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ex: Lote novo com reforço nas costuras"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
 
-    async function checkCloudflareD1Connection() {
-      try {
-        const res = await fetch('/api/devices');
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            devices = data.sort((a,b) => a.tag - b.tag);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
-          }
-          document.getElementById('txt-db-status').textContent = 'Cloudflare D1 Conectado';
-          document.getElementById('dot-db-status').className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
-          document.getElementById('btn-db-status').className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 transition-colors';
-          populateFilterDropdowns();
-          renderTable();
-          return;
-        }
-      } catch (err) {
-        // Modo local
-      }
-      document.getElementById('txt-db-status').textContent = 'Modo Local (D1 Pronto)';
-    }
+          {/* Footer Buttons */}
+          <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-sm transition-all"
+            >
+              <ArrowUpRight className="w-4 h-4" />
+              <span>Adicionar ao Estoque</span>
+            </button>
+          </div>
 
-    async function syncLocalToCloudflare() {
-      try {
-        const res = await fetch('/api/devices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(devices)
-        });
-        if (res.ok) {
-          alert(`Sucesso! ${devices.length} aparelhos sincronizados com o banco Cloudflare D1!`);
-          checkCloudflareD1Connection();
-        } else {
-          const err = await res.json();
-          alert(`Aviso: ${err.error || 'Verifique se o binding DB está ativo no Cloudflare Pages'}`);
-        }
-      } catch (e) {
-        alert('Não foi possível conectar com /api/devices. Este recurso funciona quando publicado no Cloudflare Pages com a Function e o D1 configurados.');
-      }
-    }
+        </form>
 
-    // Inicialização
-    loadLocalDevices();
-    populateFilterDropdowns();
-    renderTable();
-    checkCloudflareD1Connection();
-  </script>
-</body>
-</html>
+      </div>
+    </div>
+  );
+};
