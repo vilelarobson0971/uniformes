@@ -612,7 +612,7 @@
     const EMBEDDED_SQL = `-- ============================================================================
 -- BANCO DE DADOS: CONTROLE DE ENTRADA E SAÍDA DE UNIFORMES DE MANUTENÇÃO
 -- COMPATIBILIDADE: CLOUDFLARE D1 (SQLITE) / POSTGRESQL / MYSQL
--- Gerado em: 2026-09-30T20:23:25.234Z
+-- Gerado em: 2026-09-30T20:27:19.923Z
 -- ============================================================================
 
 -- 1. TABELA DE UNIFORMES (ESTOQUE ATUAL E PARAMETRIZAÇÃO DE ESTOQUE MÍNIMO)
@@ -760,7 +760,7 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
         localStorage.setItem('uniformes_mov_standalone_v1', JSON.stringify(movements));
       }, [movements]);
 
-      const criticalCount = items.filter(i => i.quantity <= i.minStock).length;
+      const criticalCount = items.filter(i => i.quantity < i.minStock).length;
       const zeroCount = items.filter(i => i.quantity === 0).length;
       const totalPieces = items.reduce((acc, i) => acc + i.quantity, 0);
 
@@ -768,7 +768,7 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
         const matches = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         item.size.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         item.category.toLowerCase().includes(searchTerm.toLowerCase());
-        const isCritical = item.quantity <= item.minStock;
+        const isCritical = item.quantity < item.minStock;
         return matches && (!filterCriticalOnly || isCritical);
       });
 
@@ -944,7 +944,7 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredItems.map(item => {
-                        const isCritical = item.quantity <= item.minStock;
+                        const isCritical = item.quantity < item.minStock;
                         const isZero = item.quantity === 0;
                         const rowStyle = isZero ? "bg-red-100/90 text-red-950 font-bold border-l-4 border-l-rose-700" :
                                          isCritical ? "bg-red-50 text-red-950 font-medium border-l-4 border-l-red-500" :
