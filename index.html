@@ -539,83 +539,12 @@
     "updatedAt": "2026-09-01T08:00:00.000Z"
   }
 ];
-    const INITIAL_MOVEMENTS = [
-  {
-    "id": "mov-seed-1",
-    "itemId": "cr-m",
-    "itemName": "Camisa risco 2 NR10",
-    "itemSize": "M",
-    "category": "EPI / NR10",
-    "type": "SAIDA",
-    "quantity": 2,
-    "employeeReceiver": "Carlos Eduardo Oliveira (Manutenção Elétrica)",
-    "employeeDispatcher": "Marcos Silva (Almoxarifado)",
-    "timestamp": "2026-09-28T09:30:00.000Z",
-    "reason": "Substituição periódica (6 meses)",
-    "documentRef": "MAT-4482",
-    "previousStock": 11,
-    "newStock": 9,
-    "notes": "Entrega com termo de cautela assinado"
-  },
-  {
-    "id": "mov-seed-2",
-    "itemId": "bot-42",
-    "itemName": "Botina de segurança com biqueira",
-    "itemSize": "42",
-    "category": "Calçados de Segurança",
-    "type": "SAIDA",
-    "quantity": 1,
-    "employeeReceiver": "Renato Santos (Mecânica Pesada)",
-    "employeeDispatcher": "Marcos Silva (Almoxarifado)",
-    "timestamp": "2026-09-29T14:15:00.000Z",
-    "reason": "Desgaste da sola em serviço",
-    "documentRef": "MAT-3910",
-    "previousStock": 4,
-    "newStock": 3,
-    "notes": "Botina antiga recolhida para descarte ecológico"
-  },
-  {
-    "id": "mov-seed-3",
-    "itemId": "calc-m",
-    "itemName": "Calça civil",
-    "itemSize": "M",
-    "category": "Linha Civil",
-    "type": "ENTRADA",
-    "quantity": 10,
-    "employeeReceiver": "Marcos Silva (Almoxarifado)",
-    "employeeDispatcher": "Fornecedor Confecções Brasil Ltda",
-    "timestamp": "2026-09-25T11:00:00.000Z",
-    "reason": "Compra / Reposição de estoque",
-    "documentRef": "NF-104829",
-    "previousStock": 1,
-    "newStock": 11,
-    "notes": "Lote conferido e aprovado pelo controle de qualidade"
-  },
-  {
-    "id": "mov-seed-4",
-    "itemId": "jn-p",
-    "itemName": "Jaqueta de nylon",
-    "itemSize": "P",
-    "category": "Jaquetas & Agasalhos",
-    "type": "SAIDA",
-    "quantity": 1,
-    "employeeReceiver": "Lucas Fernandes (Refrigeração)",
-    "employeeDispatcher": "Marcos Silva (Almoxarifado)",
-    "timestamp": "2026-09-30T08:45:00.000Z",
-    "reason": "Admissão de colaborador",
-    "documentRef": "MAT-5021",
-    "previousStock": 2,
-    "newStock": 1,
-    "notes": "Estoque atingiu nível crítico (1 un)"
-  }
-];
-    const EMBEDDED_SQL = `-- ============================================================================
--- BANCO DE DADOS: CONTROLE DE ENTRADA E SAÍDA DE UNIFORMES DE MANUTENÇÃO
--- COMPATIBILIDADE: CLOUDFLARE D1 (SQLITE) / POSTGRESQL / MYSQL
--- Gerado em: 2026-09-30T20:27:19.923Z
--- ============================================================================
+    const INITIAL_MOVEMENTS = [];
+    const EMBEDDED_SQL = `/* ========================================================================== */
+/* BANCO DE DADOS: CONTROLE DE UNIFORMES DE MANUTENÇÃO - CLOUDFLARE D1 (SQLITE) */
+/* ========================================================================== */
 
--- 1. TABELA DE UNIFORMES (ESTOQUE ATUAL E PARAMETRIZAÇÃO DE ESTOQUE MÍNIMO)
+/* 1. CRIAÇÃO DAS TABELAS E ÍNDICES */
 DROP TABLE IF EXISTS movimentacoes;
 DROP TABLE IF EXISTS uniformes;
 
@@ -633,7 +562,6 @@ CREATE TABLE IF NOT EXISTS uniformes (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. TABELA DE HISTÓRICO DE MOVIMENTAÇÕES (ENTRADAS E SAÍDAS / CAUTELAS)
 CREATE TABLE IF NOT EXISTS movimentacoes (
     id TEXT PRIMARY KEY,
     uniforme_id TEXT NOT NULL,
@@ -642,11 +570,11 @@ CREATE TABLE IF NOT EXISTS movimentacoes (
     categoria TEXT NOT NULL,
     tipo TEXT NOT NULL CHECK(tipo IN ('ENTRADA', 'SAIDA', 'AJUSTE')),
     quantidade INTEGER NOT NULL,
-    funcionario_recebeu TEXT NOT NULL,    -- Funcionário recebedor da vestimenta
-    funcionario_entregou TEXT NOT NULL,    -- Funcionário que entregou (almoxarife)
-    data_hora TEXT NOT NULL,               -- Data e horário automático ISO
-    motivo TEXT NOT NULL,                  -- Admissão, Desgaste, Compra, etc.
-    documento_ref TEXT,                   -- Matrícula, Nº NF, O.S.
+    funcionario_recebeu TEXT NOT NULL,
+    funcionario_entregou TEXT NOT NULL,
+    data_hora TEXT NOT NULL,
+    motivo TEXT NOT NULL,
+    documento_ref TEXT,
     saldo_anterior INTEGER NOT NULL,
     saldo_novo INTEGER NOT NULL,
     observacoes TEXT,
@@ -654,16 +582,13 @@ CREATE TABLE IF NOT EXISTS movimentacoes (
     FOREIGN KEY (uniforme_id) REFERENCES uniformes(id) ON DELETE CASCADE
 );
 
--- 3. ÍNDICES DE PERFORMANCE PARA CLOUDFLARE D1
 CREATE INDEX IF NOT EXISTS idx_uniformes_categoria ON uniformes(categoria);
 CREATE INDEX IF NOT EXISTS idx_uniformes_estoque_critico ON uniformes(quantidade, estoque_minimo);
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_uniforme_id ON movimentacoes(uniforme_id);
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_data_hora ON movimentacoes(data_hora DESC);
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_funcionario ON movimentacoes(funcionario_recebeu);
 
--- ============================================================================
--- 4. CARGA INICIAL DE UNIFORMES EM ESTOQUE (PARAMETRIZAÇÃO OFICIAL)
--- ============================================================================
+/* 2. CARGA DOS 42 UNIFORMES PARAMETRIZADOS */
 INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo, unidade, localizacao, observacoes, created_at, updated_at) VALUES
 ('jn-p', 'Jaqueta de nylon', 'P', 'Jaquetas & Agasalhos', 1, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
 ('jn-m', 'Jaqueta de nylon', 'M', 'Jaquetas & Agasalhos', 3, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
@@ -708,14 +633,7 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
 ('bot-44', 'Botina de segurança com biqueira', '44', 'Calçados de Segurança', 0, 1, 'par', 'Prateleira F2', 'Grade esgotada', '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
 ('bot-45', 'Botina de segurança com biqueira', '45', 'Calçados de Segurança', 2, 1, 'par', 'Prateleira F2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z');
 
--- ============================================================================
--- 5. HISTÓRICO INICIAL DE MOVIMENTAÇÕES (ENTRADAS E SAÍDAS)
--- ============================================================================
-INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, categoria, tipo, quantidade, funcionario_recebeu, funcionario_entregou, data_hora, motivo, documento_ref, saldo_anterior, saldo_novo, observacoes, created_at) VALUES
-('mov-seed-1', 'cr-m', 'Camisa risco 2 NR10', 'M', 'EPI / NR10', 'SAIDA', 2, 'Carlos Eduardo Oliveira (Manutenção Elétrica)', 'Marcos Silva (Almoxarifado)', '2026-09-28T09:30:00.000Z', 'Substituição periódica (6 meses)', 'MAT-4482', 11, 9, 'Entrega com termo de cautela assinado', '2026-09-28T09:30:00.000Z'),
-('mov-seed-2', 'bot-42', 'Botina de segurança com biqueira', '42', 'Calçados de Segurança', 'SAIDA', 1, 'Renato Santos (Mecânica Pesada)', 'Marcos Silva (Almoxarifado)', '2026-09-29T14:15:00.000Z', 'Desgaste da sola em serviço', 'MAT-3910', 4, 3, 'Botina antiga recolhida para descarte ecológico', '2026-09-29T14:15:00.000Z'),
-('mov-seed-3', 'calc-m', 'Calça civil', 'M', 'Linha Civil', 'ENTRADA', 10, 'Marcos Silva (Almoxarifado)', 'Fornecedor Confecções Brasil Ltda', '2026-09-25T11:00:00.000Z', 'Compra / Reposição de estoque', 'NF-104829', 1, 11, 'Lote conferido e aprovado pelo controle de qualidade', '2026-09-25T11:00:00.000Z'),
-('mov-seed-4', 'jn-p', 'Jaqueta de nylon', 'P', 'Jaquetas & Agasalhos', 'SAIDA', 1, 'Lucas Fernandes (Refrigeração)', 'Marcos Silva (Almoxarifado)', '2026-09-30T08:45:00.000Z', 'Admissão de colaborador', 'MAT-5021', 2, 1, 'Estoque atingiu nível crítico (1 un)', '2026-09-30T08:45:00.000Z');
+/* 3. HISTÓRICO DE MOVIMENTAÇÕES INICIAIS */
 `;
 
     function StandaloneApp() {
@@ -730,9 +648,15 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
       const [movements, setMovements] = React.useState(() => {
         try {
           const saved = localStorage.getItem('uniformes_mov_standalone_v1');
-          if (saved) return JSON.parse(saved);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            // Filtra movimentações antigas de demonstração para manter o histórico 100% limpo
+            if (Array.isArray(parsed)) {
+              return parsed.filter(m => !m.id || !m.id.startsWith('mov-seed-'));
+            }
+          }
         } catch(e) {}
-        return INITIAL_MOVEMENTS;
+        return [];
       });
 
       const [activeTab, setActiveTab] = React.useState('inventory');
@@ -830,7 +754,8 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
         alert('Estoque reabastecido com sucesso!');
       };
 
-      const handleExportPdf = () => {
+      // 1. Exportar Inventário Geral (Modelos, tamanhos, estoque atual, mínimo e status)
+      const handleExportInventoryPdf = () => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFillColor(30, 41, 59);
@@ -838,7 +763,49 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text('CONTROLE DE UNIFORMES DE MANUTENÇÃO - HISTÓRICO GERAL', 14, 14);
+        doc.text('CONTROLE DE UNIFORMES DE MANUTENÇÃO - INVENTÁRIO GERAL DE ESTOQUE', 14, 14);
+
+        const data = items.map(item => {
+          const isZero = item.quantity === 0;
+          const isCrit = item.quantity < item.minStock;
+          const status = isZero ? 'ZERADO' : isCrit ? 'CRÍTICO' : 'OK';
+          return [
+            item.category,
+            item.name,
+            item.size,
+            item.quantity + ' ' + (item.unit || 'peça'),
+            'mín. ' + item.minStock + ' ' + (item.unit || 'peça'),
+            status,
+            item.location || 'Almoxarifado'
+          ];
+        });
+
+        doc.autoTable({
+          startY: 28,
+          head: [['Categoria', 'Modelo do Uniforme', 'Tam.', 'Estoque Atual', 'Estoque Mínimo', 'Status', 'Localização']],
+          body: data,
+          theme: 'grid',
+          headStyles: { fillColor: [30, 41, 59] },
+          styles: { fontSize: 8 }
+        });
+
+        doc.save('inventario-geral-uniformes-' + new Date().toISOString().slice(0,10) + '.pdf');
+      };
+
+      // 2. Exportar Histórico de Movimentações (Somente saídas e entradas realizadas pelo usuário)
+      const handleExportMovementsPdf = () => {
+        if (movements.length === 0) {
+          alert('Nenhuma movimentação realizada ainda.');
+          return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFillColor(30, 41, 59);
+        doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('CONTROLE DE UNIFORMES DE MANUTENÇÃO - HISTÓRICO DE MOVIMENTAÇÕES', 14, 14);
 
         const data = movements.map(m => [
           new Date(m.timestamp).toLocaleString('pt-BR'),
@@ -859,7 +826,15 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
           headStyles: { fillColor: [30, 41, 59] }
         });
 
-        doc.save('relatorio-uniformes-' + new Date().toISOString().slice(0,10) + '.pdf');
+        doc.save('historico-movimentacoes-' + new Date().toISOString().slice(0,10) + '.pdf');
+      };
+
+      // 3. Limpar histórico de movimentações
+      const handleClearMovements = () => {
+        if (confirm('Tem certeza que deseja zerar o histórico de movimentações?')) {
+          setMovements([]);
+          localStorage.removeItem('uniformes_mov_standalone_v1');
+        }
       };
 
       return (
@@ -922,8 +897,8 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
                     >
                       {filterCriticalOnly ? "Mostrando apenas críticos" : "Filtrar Críticos"}
                     </button>
-                    <button onClick={handleExportPdf} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-500">
-                      Exportar PDF Geral
+                    <button onClick={handleExportInventoryPdf} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-500">
+                      Exportar Inventário Geral (PDF)
                     </button>
                   </div>
                 </div>
@@ -987,40 +962,55 @@ INSERT INTO movimentacoes (id, uniforme_id, nome_uniforme, tamanho_uniforme, cat
               <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden p-4 space-y-4">
                 <div className="flex justify-between items-center">
                   <h2 className="font-bold text-sm">Histórico de Entradas & Saídas</h2>
-                  <button onClick={handleExportPdf} className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold">
-                    Baixar Relatório em PDF
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {movements.length > 0 && (
+                      <button onClick={handleClearMovements} className="bg-rose-100 hover:bg-rose-200 text-rose-700 px-3 py-1.5 rounded text-xs font-bold">
+                        🗑️ Limpar Histórico
+                      </button>
+                    )}
+                    <button onClick={handleExportMovementsPdf} className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-500">
+                      Exportar Histórico (PDF)
+                    </button>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-100 font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="p-2">Data/Hora</th>
-                        <th className="p-2">Tipo</th>
-                        <th className="p-2">Uniforme</th>
-                        <th className="p-2">Qtd</th>
-                        <th className="p-2">Recebido Por</th>
-                        <th className="p-2">Entregador</th>
-                        <th className="p-2">Motivo</th>
-                        <th className="p-2">Saldo</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {movements.map(m => (
-                        <tr key={m.id} className="hover:bg-slate-50">
-                          <td className="p-2 whitespace-nowrap">{new Date(m.timestamp).toLocaleString('pt-BR')}</td>
-                          <td className="p-2 font-bold">{m.type === 'SAIDA' ? <span className="text-red-600">SAÍDA</span> : <span className="text-emerald-600">ENTRADA</span>}</td>
-                          <td className="p-2 font-semibold">{m.itemName} ({m.itemSize})</td>
-                          <td className="p-2 font-extrabold">{m.type === 'SAIDA' ? '-' + m.quantity : '+' + m.quantity}</td>
-                          <td className="p-2">{m.employeeReceiver}</td>
-                          <td className="p-2 text-slate-500">{m.employeeDispatcher}</td>
-                          <td className="p-2">{m.reason}</td>
-                          <td className="p-2 font-bold">{m.newStock} un</td>
+
+                {movements.length === 0 ? (
+                  <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200 text-slate-500 text-xs">
+                    <p className="font-bold text-slate-700 text-sm">Nenhuma movimentação registrada até o momento.</p>
+                    <p className="mt-1 text-slate-500">As novas retiradas e reposições efetuadas no almoxarifado aparecerão aqui automaticamente.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-100 font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="p-2">Data/Hora</th>
+                          <th className="p-2">Tipo</th>
+                          <th className="p-2">Uniforme</th>
+                          <th className="p-2">Qtd</th>
+                          <th className="p-2">Recebido Por</th>
+                          <th className="p-2">Entregador</th>
+                          <th className="p-2">Motivo</th>
+                          <th className="p-2">Saldo</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {movements.map(m => (
+                          <tr key={m.id} className="hover:bg-slate-50">
+                            <td className="p-2 whitespace-nowrap">{new Date(m.timestamp).toLocaleString('pt-BR')}</td>
+                            <td className="p-2 font-bold">{m.type === 'SAIDA' ? <span className="text-red-600">SAÍDA</span> : <span className="text-emerald-600">ENTRADA</span>}</td>
+                            <td className="p-2 font-semibold">{m.itemName} ({m.itemSize})</td>
+                            <td className="p-2 font-extrabold">{m.type === 'SAIDA' ? '-' + m.quantity : '+' + m.quantity}</td>
+                            <td className="p-2">{m.employeeReceiver}</td>
+                            <td className="p-2 text-slate-500">{m.employeeDispatcher}</td>
+                            <td className="p-2">{m.reason}</td>
+                            <td className="p-2 font-bold">{m.newStock} un</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
