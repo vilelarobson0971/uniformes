@@ -540,101 +540,6 @@
   }
 ];
     const INITIAL_MOVEMENTS = [];
-    const EMBEDDED_SQL = `/* ========================================================================== */
-/* BANCO DE DADOS: CONTROLE DE UNIFORMES DE MANUTENÇÃO - CLOUDFLARE D1 (SQLITE) */
-/* ========================================================================== */
-
-/* 1. CRIAÇÃO DAS TABELAS E ÍNDICES */
-DROP TABLE IF EXISTS movimentacoes;
-DROP TABLE IF EXISTS uniformes;
-
-CREATE TABLE IF NOT EXISTS uniformes (
-    id TEXT PRIMARY KEY,
-    nome TEXT NOT NULL,
-    tamanho TEXT NOT NULL,
-    categoria TEXT NOT NULL,
-    quantidade INTEGER NOT NULL DEFAULT 0,
-    estoque_minimo INTEGER NOT NULL DEFAULT 1,
-    unidade TEXT NOT NULL DEFAULT 'peça',
-    localizacao TEXT,
-    observacoes TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS movimentacoes (
-    id TEXT PRIMARY KEY,
-    uniforme_id TEXT NOT NULL,
-    nome_uniforme TEXT NOT NULL,
-    tamanho_uniforme TEXT NOT NULL,
-    categoria TEXT NOT NULL,
-    tipo TEXT NOT NULL CHECK(tipo IN ('ENTRADA', 'SAIDA', 'AJUSTE')),
-    quantidade INTEGER NOT NULL,
-    funcionario_recebeu TEXT NOT NULL,
-    funcionario_entregou TEXT NOT NULL,
-    data_hora TEXT NOT NULL,
-    motivo TEXT NOT NULL,
-    documento_ref TEXT,
-    saldo_anterior INTEGER NOT NULL,
-    saldo_novo INTEGER NOT NULL,
-    observacoes TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (uniforme_id) REFERENCES uniformes(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_uniformes_categoria ON uniformes(categoria);
-CREATE INDEX IF NOT EXISTS idx_uniformes_estoque_critico ON uniformes(quantidade, estoque_minimo);
-CREATE INDEX IF NOT EXISTS idx_movimentacoes_uniforme_id ON movimentacoes(uniforme_id);
-CREATE INDEX IF NOT EXISTS idx_movimentacoes_data_hora ON movimentacoes(data_hora DESC);
-CREATE INDEX IF NOT EXISTS idx_movimentacoes_funcionario ON movimentacoes(funcionario_recebeu);
-
-/* 2. CARGA DOS 42 UNIFORMES PARAMETRIZADOS */
-INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo, unidade, localizacao, observacoes, created_at, updated_at) VALUES
-('jn-p', 'Jaqueta de nylon', 'P', 'Jaquetas & Agasalhos', 1, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('jn-m', 'Jaqueta de nylon', 'M', 'Jaquetas & Agasalhos', 3, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('jn-g', 'Jaqueta de nylon', 'G', 'Jaquetas & Agasalhos', 3, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('jn-gg', 'Jaqueta de nylon', 'GG', 'Jaquetas & Agasalhos', 2, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('jn-eg', 'Jaqueta de nylon', 'EG', 'Jaquetas & Agasalhos', 2, 2, 'peça', 'Prateleira A1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cs-m', 'Camisa social manga longa azul', 'M', 'Camisas Sociais', 7, 2, 'peça', 'Prateleira B1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cs-g', 'Camisa social manga longa azul', 'G', 'Camisas Sociais', 3, 2, 'peça', 'Prateleira B1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cs-gg', 'Camisa social manga longa azul', 'GG', 'Camisas Sociais', 4, 2, 'peça', 'Prateleira B1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cp-m', 'Camisa polo preta', 'M', 'Camisas Polo', 2, 2, 'peça', 'Prateleira B2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cp-g', 'Camisa polo preta', 'G', 'Camisas Polo', 1, 2, 'peça', 'Prateleira B2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cp-gg', 'Camisa polo preta', 'GG', 'Camisas Polo', 2, 2, 'peça', 'Prateleira B2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cj-g', 'Calça jeans', 'G', 'Calças Jeans', 1, 1, 'peça', 'Prateleira C1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cj-gg', 'Calça jeans', 'GG', 'Calças Jeans', 1, 1, 'peça', 'Prateleira C1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cc-p', 'Camisa civil manga curta', 'P', 'Linha Civil', 6, 3, 'peça', 'Prateleira D1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cc-m', 'Camisa civil manga curta', 'M', 'Linha Civil', 8, 5, 'peça', 'Prateleira D1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cc-g', 'Camisa civil manga curta', 'G', 'Linha Civil', 4, 3, 'peça', 'Prateleira D1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cc-gg', 'Camisa civil manga curta', 'GG', 'Linha Civil', 4, 3, 'peça', 'Prateleira D1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cc-eg', 'Camisa civil manga curta', 'EG', 'Linha Civil', 2, 3, 'peça', 'Prateleira D1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('calc-p', 'Calça civil', 'P', 'Linha Civil', 4, 3, 'peça', 'Prateleira D2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('calc-m', 'Calça civil', 'M', 'Linha Civil', 11, 5, 'peça', 'Prateleira D2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('calc-g', 'Calça civil', 'G', 'Linha Civil', 7, 3, 'peça', 'Prateleira D2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('calc-gg', 'Calça civil', 'GG', 'Linha Civil', 4, 3, 'peça', 'Prateleira D2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('calc-eg', 'Calça civil', 'EG', 'Linha Civil', 2, 3, 'peça', 'Prateleira D2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cr-p', 'Camisa risco 2 NR10', 'P', 'EPI / NR10', 1, 1, 'peça', 'Prateleira E1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cr-m', 'Camisa risco 2 NR10', 'M', 'EPI / NR10', 9, 5, 'peça', 'Prateleira E1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cr-g', 'Camisa risco 2 NR10', 'G', 'EPI / NR10', 6, 3, 'peça', 'Prateleira E1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cr-gg', 'Camisa risco 2 NR10', 'GG', 'EPI / NR10', 0, 2, 'peça', 'Prateleira E1', 'Aguardando entrega de fornecedor', '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('cr-xg', 'Camisa risco 2 NR10', 'XG', 'EPI / NR10', 3, 1, 'peça', 'Prateleira E1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('clr-p', 'Calça risco 2 NR10', 'P', 'EPI / NR10', 1, 1, 'peça', 'Prateleira E2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('clr-m', 'Calça risco 2 NR10', 'M', 'EPI / NR10', 6, 5, 'peça', 'Prateleira E2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('clr-g', 'Calça risco 2 NR10', 'G', 'EPI / NR10', 5, 3, 'peça', 'Prateleira E2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('clr-gg', 'Calça risco 2 NR10', 'GG', 'EPI / NR10', 0, 1, 'peça', 'Prateleira E2', 'Necessidade urgente de reposição', '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('clr-xg', 'Calça risco 2 NR10', 'XG', 'EPI / NR10', 0, 0, 'peça', 'Prateleira E2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-37', 'Botina de segurança com biqueira', '37', 'Calçados de Segurança', 1, 1, 'par', 'Prateleira F1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-38', 'Botina de segurança com biqueira', '38', 'Calçados de Segurança', 3, 1, 'par', 'Prateleira F1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-39', 'Botina de segurança com biqueira', '39', 'Calçados de Segurança', 2, 2, 'par', 'Prateleira F1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-40', 'Botina de segurança com biqueira', '40', 'Calçados de Segurança', 3, 2, 'par', 'Prateleira F1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-41', 'Botina de segurança com biqueira', '41', 'Calçados de Segurança', 1, 3, 'par', 'Prateleira F1', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-42', 'Botina de segurança com biqueira', '42', 'Calçados de Segurança', 3, 2, 'par', 'Prateleira F2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-43', 'Botina de segurança com biqueira', '43', 'Calçados de Segurança', 4, 2, 'par', 'Prateleira F2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-44', 'Botina de segurança com biqueira', '44', 'Calçados de Segurança', 0, 1, 'par', 'Prateleira F2', 'Grade esgotada', '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z'),
-('bot-45', 'Botina de segurança com biqueira', '45', 'Calçados de Segurança', 2, 1, 'par', 'Prateleira F2', NULL, '2026-09-01T08:00:00.000Z', '2026-09-01T08:00:00.000Z');
-
-/* 3. HISTÓRICO DE MOVIMENTAÇÕES INICIAIS */
-`;
 
     function StandaloneApp() {
       const [items, setItems] = React.useState(() => {
@@ -674,7 +579,59 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
       const [quantity, setQuantity] = React.useState(1);
       const [reason, setReason] = React.useState('Substituição por desgaste');
       const [docRef, setDocRef] = React.useState('');
-      const [copiedSql, setCopiedSql] = React.useState(false);
+      const [isD1Connected, setIsD1Connected] = React.useState(false);
+
+      React.useEffect(() => {
+        async function loadCloudflareData() {
+          try {
+            const res = await fetch('/api/uniformes');
+            if (res.ok) {
+              const data = await res.json();
+              if (Array.isArray(data) && data.length > 0) {
+                const mapped = data.map(d => ({
+                  id: d.id,
+                  name: d.nome || d.name,
+                  size: d.tamanho || d.size,
+                  category: d.categoria || d.category,
+                  quantity: d.quantidade !== undefined ? d.quantidade : d.quantity,
+                  minStock: d.estoque_minimo !== undefined ? d.estoque_minimo : d.minStock,
+                  unit: d.unidade || d.unit || 'peça',
+                  location: d.localizacao || d.location || 'Almoxarifado Central'
+                }));
+                setItems(mapped);
+                setIsD1Connected(true);
+              }
+            }
+
+            const movRes = await fetch('/api/movimentacoes');
+            if (movRes.ok) {
+              const dataMov = await movRes.json();
+              if (Array.isArray(dataMov)) {
+                const mappedMov = dataMov.map(m => ({
+                  id: m.id,
+                  itemId: m.uniforme_id || m.itemId,
+                  itemName: m.nome_uniforme || m.itemName,
+                  itemSize: m.tamanho_uniforme || m.itemSize,
+                  category: m.categoria || m.category,
+                  type: m.tipo || m.type,
+                  quantity: m.quantidade || m.quantity,
+                  employeeReceiver: m.funcionario_recebeu || m.employeeReceiver,
+                  employeeDispatcher: m.funcionario_entregou || m.employeeDispatcher,
+                  timestamp: m.data_hora || m.timestamp,
+                  reason: m.motivo || m.reason,
+                  documentRef: m.documento_ref || m.documentRef,
+                  newStock: m.saldo_novo !== undefined ? m.saldo_novo : m.newStock
+                })).filter(m => !m.id.startsWith('mov-seed-'));
+                setMovements(mappedMov);
+                setIsD1Connected(true);
+              }
+            }
+          } catch(e) {
+            console.log('Modo offline / local:', e);
+          }
+        }
+        loadCloudflareData();
+      }, []);
 
       React.useEffect(() => {
         localStorage.setItem('uniformes_data_standalone_v1', JSON.stringify(items));
@@ -723,6 +680,26 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
         setMovements(prev => [newMov, ...prev]);
         setWithdrawalOpen(false);
         setReceiver('');
+
+        // Sincroniza com Cloudflare D1 em tempo real
+        fetch('/api/movimentacoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newMov.id,
+            uniforme_id: selectedItem.id,
+            tipo: 'SAIDA',
+            quantidade: quantity,
+            funcionario_recebeu: receiver.trim(),
+            funcionario_entregou: dispatcher.trim(),
+            data_hora: now,
+            motivo: reason,
+            documento_ref: docRef
+          })
+        }).then(res => {
+          if (res.ok) setIsD1Connected(true);
+        }).catch(err => console.warn('Erro ao sincronizar com D1:', err));
+
         alert('Retirada registrada com sucesso para ' + receiver);
       };
 
@@ -751,6 +728,26 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
         setItems(prev => prev.map(i => i.id === selectedItem.id ? {...i, quantity: i.quantity + quantity} : i));
         setMovements(prev => [newMov, ...prev]);
         setEntryOpen(false);
+
+        // Sincroniza com Cloudflare D1 em tempo real
+        fetch('/api/movimentacoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newMov.id,
+            uniforme_id: selectedItem.id,
+            tipo: 'ENTRADA',
+            quantidade: quantity,
+            funcionario_recebeu: dispatcher.trim(),
+            funcionario_entregou: receiver.trim() || 'Fornecedor',
+            data_hora: now,
+            motivo: reason || 'Compra / Reposição',
+            documento_ref: docRef
+          })
+        }).then(res => {
+          if (res.ok) setIsD1Connected(true);
+        }).catch(err => console.warn('Erro ao sincronizar com D1:', err));
+
         alert('Estoque reabastecido com sucesso!');
       };
 
@@ -845,8 +842,20 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">👕</span>
                 <div>
-                  <h1 className="text-lg font-bold">Controle de Uniformes de Manutenção</h1>
-                  <p className="text-xs text-slate-400">Versão GitHub Standalone • Armazenamento Local & Cloudflare D1</p>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-bold">Controle de Uniformes de Manutenção</h1>
+                    {isD1Connected ? (
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Nuvem D1 Conectada
+                      </span>
+                    ) : (
+                      <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                        Almoxarifado
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400">Gestão de estoque, cautela de entrega e controle de reposição</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -870,9 +879,6 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
               </button>
               <button onClick={() => setActiveTab('movements')} className={activeTab === 'movements' ? 'text-blue-400 border-b-2 border-blue-400 pb-1' : 'text-slate-400'}>
                 Histórico ({movements.length})
-              </button>
-              <button onClick={() => setActiveTab('sql')} className={activeTab === 'sql' ? 'text-blue-400 border-b-2 border-blue-400 pb-1' : 'text-slate-400'}>
-                Script SQL & Cloudflare D1
               </button>
             </div>
           </header>
@@ -1011,30 +1017,6 @@ INSERT INTO uniformes (id, nome, tamanho, categoria, quantidade, estoque_minimo,
                     </table>
                   </div>
                 )}
-              </div>
-            )}
-
-            {activeTab === 'sql' && (
-              <div className="bg-white p-5 rounded-xl shadow-xs border border-slate-200 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h2 className="font-bold text-base">Script SQL para Cloudflare D1 (SQLite)</h2>
-                    <p className="text-xs text-slate-500">Pronto para rodar via Wrangler CLI no Cloudflare D1</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(EMBEDDED_SQL);
-                      setCopiedSql(true);
-                      setTimeout(() => setCopiedSql(false), 2000);
-                    }}
-                    className="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-500"
-                  >
-                    {copiedSql ? 'Copiado!' : 'Copiar Script SQL'}
-                  </button>
-                </div>
-                <pre className="bg-slate-900 text-slate-200 p-4 rounded-lg font-mono text-xs overflow-x-auto max-h-[450px]">
-                  {EMBEDDED_SQL}
-                </pre>
               </div>
             )}
           </main>
