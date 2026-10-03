@@ -581,6 +581,17 @@
       const [docRef, setDocRef] = React.useState('');
       const [isD1Connected, setIsD1Connected] = React.useState(false);
 
+      // Edit Item states
+      const [editOpen, setEditOpen] = React.useState(false);
+      const [editItem, setEditItem] = React.useState(null);
+      const [editName, setEditName] = React.useState('');
+      const [editSize, setEditSize] = React.useState('');
+      const [editCategory, setEditCategory] = React.useState('');
+      const [editQuantity, setEditQuantity] = React.useState(0);
+      const [editMinStock, setEditMinStock] = React.useState(1);
+      const [editUnit, setEditUnit] = React.useState('peça');
+      const [editLocation, setEditLocation] = React.useState('');
+
       React.useEffect(() => {
         async function loadCloudflareData() {
           try {
@@ -631,6 +642,9 @@
           }
         }
         loadCloudflareData();
+        // Polling automático a cada 10 segundos para manter todos os computadores sincronizados
+        const interval = setInterval(loadCloudflareData, 10000);
+        return () => clearInterval(interval);
       }, []);
 
       React.useEffect(() => {
@@ -751,6 +765,61 @@
         alert('Estoque reabastecido com sucesso!');
       };
 
+      const handleOpenEditModal = (item) => {
+        setEditItem(item);
+        setEditName(item.name);
+        setEditSize(item.size);
+        setEditCategory(item.category);
+        setEditQuantity(item.quantity);
+        setEditMinStock(item.minStock);
+        setEditUnit(item.unit || 'peça');
+        setEditLocation(item.location || 'Almoxarifado Central');
+        setEditOpen(true);
+      };
+
+      const handleSaveEdit = async () => {
+        if (!editItem) return;
+        if (!editName.trim()) { alert('Informe o nome do modelo do uniforme'); return; }
+        if (!editSize.trim()) { alert('Informe o tamanho'); return; }
+
+        const updated = {
+          ...editItem,
+          name: editName.trim(),
+          size: editSize.trim().toUpperCase(),
+          category: editCategory.trim(),
+          quantity: Math.max(0, parseInt(editQuantity) || 0),
+          minStock: Math.max(0, parseInt(editMinStock) || 0),
+          unit: editUnit.trim() || 'peça',
+          location: editLocation.trim() || 'Almoxarifado Central'
+        };
+
+        setItems(prev => prev.map(i => i.id === editItem.id ? updated : i));
+        setEditOpen(false);
+
+        // Envia para o Cloudflare D1 em tempo real
+        try {
+          await fetch('/api/uniformes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: updated.id,
+              nome: updated.name,
+              tamanho: updated.size,
+              categoria: updated.category,
+              quantidade: updated.quantity,
+              estoque_minimo: updated.minStock,
+              unidade: updated.unit,
+              localizacao: updated.location
+            })
+          });
+          setIsD1Connected(true);
+          alert('Uniforme e estoque mínimo atualizados com sucesso no Cloudflare D1!');
+        } catch (e) {
+          console.warn('Erro ao sincronizar com D1:', e);
+          alert('Alteração salva localmente no navegador!');
+        }
+      };
+
       // 1. Exportar Inventário Geral (Modelos, tamanhos, estoque atual, mínimo e status)
       const handleExportInventoryPdf = () => {
         const { jsPDF } = window.jspdf;
@@ -827,10 +896,13 @@
       };
 
       // 3. Limpar histórico de movimentações
-      const handleClearMovements = () => {
-        if (confirm('Tem certeza que deseja zerar o histórico de movimentações?')) {
+      const handleClearMovements = async () => {
+        if (confirm('Tem certeza que deseja zerar o histórico de movimentações em todos os computadores?')) {
           setMovements([]);
           localStorage.removeItem('uniformes_mov_standalone_v1');
+          try {
+            await fetch('/api/movimentacoes/limpar', { method: 'POST' });
+          } catch(e) {}
         }
       };
 
@@ -859,6 +931,13 @@
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => loadCloudflareData()}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-700"
+                  title="Atualizar dados do Cloudflare D1 agora"
+                >
+                  🔄 Sincronizar
+                </button>
                 {criticalCount > 0 && (
                   <button onClick={() => setFilterCriticalOnly(!filterCriticalOnly)} className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 animate-pulse">
                     ⚠️ {criticalCount} Itens Críticos ({zeroCount} zerados)
@@ -945,14 +1024,23 @@
                                 onClick={() => { setSelectedItem(item); setWithdrawalOpen(true); }}
                                 disabled={item.quantity === 0}
                                 className="bg-amber-600 disabled:opacity-30 text-white px-2 py-1 rounded text-xs mr-1 font-semibold"
+                                title="Registrar saída / entrega"
                               >
                                 Retirar
                               </button>
                               <button
                                 onClick={() => { setSelectedItem(item); setEntryOpen(true); }}
-                                className="bg-emerald-600 text-white px-2 py-1 rounded text-xs font-semibold"
+                                className="bg-emerald-600 text-white px-2 py-1 rounded text-xs mr-1 font-semibold"
+                                title="Registrar entrada / reposição"
                               >
                                 Repor
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditModal(item)}
+                                className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs font-semibold"
+                                title="Editar características e alterar estoque mínimo"
+                              >
+                                ✏️ Editar
                               </button>
                             </td>
                           </tr>
@@ -1026,7 +1114,23 @@
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-xl p-5 max-w-md w-full space-y-3">
                 <h3 className="font-bold text-base text-amber-700">Registrar Retirada de Uniforme</h3>
-                <p className="text-xs text-slate-600">Item: <strong>{selectedItem.name} ({selectedItem.size})</strong> - Saldo: {selectedItem.quantity} {selectedItem.unit}</p>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Selecione o Uniforme *</label>
+                  <select
+                    value={selectedItem.id}
+                    onChange={e => {
+                      const found = items.find(i => i.id === e.target.value);
+                      if (found) setSelectedItem(found);
+                    }}
+                    className="w-full border p-2 text-xs rounded bg-white font-medium"
+                  >
+                    {items.map(i => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} (Tam: {i.size}) — {i.quantity} {i.unit} disponíveis
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs font-bold mb-1">Nome do Funcionário que Recebeu *</label>
                   <input type="text" value={receiver} onChange={e => setReceiver(e.target.value)} placeholder="Ex: Lucas Silva" className="w-full border p-2 text-xs rounded" />
@@ -1038,7 +1142,7 @@
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-bold mb-1">Quantidade *</label>
-                    <input type="number" min="1" max={selectedItem.quantity} value={quantity} onChange={e => setQuantity(parseInt(e.target.value)||1)} className="w-full border p-2 text-xs rounded font-bold" />
+                    <input type="number" min="1" max={selectedItem.quantity || 1} value={quantity} onChange={e => setQuantity(parseInt(e.target.value)||1)} className="w-full border p-2 text-xs rounded font-bold" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1">Motivo</label>
@@ -1062,9 +1166,25 @@
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-xl p-5 max-w-md w-full space-y-3">
                 <h3 className="font-bold text-base text-emerald-700">Entrada / Reposição de Uniformes</h3>
-                <p className="text-xs text-slate-600">Item: <strong>{selectedItem.name} ({selectedItem.size})</strong> - Saldo atual: {selectedItem.quantity} {selectedItem.unit}</p>
                 <div>
-                  <label className="block text-xs font-bold mb-1">Quantidade Comprada *</label>
+                  <label className="block text-xs font-bold mb-1">Selecione o Uniforme *</label>
+                  <select
+                    value={selectedItem.id}
+                    onChange={e => {
+                      const found = items.find(i => i.id === e.target.value);
+                      if (found) setSelectedItem(found);
+                    }}
+                    className="w-full border p-2 text-xs rounded bg-white font-medium"
+                  >
+                    {items.map(i => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} (Tam: {i.size}) — Saldo Atual: {i.quantity} {i.unit}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Quantidade Comprada / Adicionada *</label>
                   <input type="number" min="1" value={quantity} onChange={e => setQuantity(parseInt(e.target.value)||1)} className="w-full border p-2 text-xs rounded font-bold text-emerald-700" />
                 </div>
                 <div>
@@ -1078,6 +1198,111 @@
                 <div className="flex justify-end gap-2 pt-2 border-t">
                   <button onClick={() => setEntryOpen(false)} className="px-3 py-1.5 text-xs text-slate-600">Cancelar</button>
                   <button onClick={handleConfirmEntry} className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded">Adicionar ao Estoque</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Edição de Item & Estoque Mínimo */}
+          {editOpen && editItem && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-xl p-5 max-w-md w-full space-y-3 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <h3 className="font-bold text-base text-slate-800 flex items-center gap-1.5">
+                    <span>✏️</span> Editar Dados e Estoque Mínimo
+                  </h3>
+                  <button onClick={() => setEditOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Modelo / Nome do Uniforme *</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="w-full border p-2 text-xs rounded font-medium"
+                    placeholder="Ex: Camisa risco 2 NR10"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Tamanho *</label>
+                    <input
+                      type="text"
+                      value={editSize}
+                      onChange={e => setEditSize(e.target.value)}
+                      className="w-full border p-2 text-xs rounded font-bold uppercase"
+                      placeholder="Ex: M, G, 42"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Unidade</label>
+                    <select
+                      value={editUnit}
+                      onChange={e => setEditUnit(e.target.value)}
+                      className="w-full border p-2 text-xs rounded bg-white"
+                    >
+                      <option value="peça">peça</option>
+                      <option value="par">par</option>
+                      <option value="conjunto">conjunto</option>
+                      <option value="kit">kit</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Categoria</label>
+                  <input
+                    type="text"
+                    value={editCategory}
+                    onChange={e => setEditCategory(e.target.value)}
+                    className="w-full border p-2 text-xs rounded"
+                    placeholder="Ex: EPI / NR10, Linha Civil, Calçados"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2 bg-blue-50/70 p-2.5 rounded-lg border border-blue-200">
+                  <div>
+                    <label className="block text-xs font-bold mb-1 text-blue-900">
+                      Estoque Mínimo (Alerta) *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editMinStock}
+                      onChange={e => setEditMinStock(parseInt(e.target.value) || 0)}
+                      className="w-full border border-blue-300 p-2 text-xs rounded font-extrabold text-blue-900 bg-white"
+                    />
+                    <span className="text-[10px] text-blue-700 block mt-0.5">
+                      Abaixo deste valor fica vermelho.
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 text-slate-800">
+                      Saldo Atual em Estoque
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editQuantity}
+                      onChange={e => setEditQuantity(parseInt(e.target.value) || 0)}
+                      className="w-full border p-2 text-xs rounded font-bold bg-white"
+                    />
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      Ajuste direto do saldo físico.
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Localização no Almoxarifado</label>
+                  <input
+                    type="text"
+                    value={editLocation}
+                    onChange={e => setEditLocation(e.target.value)}
+                    className="w-full border p-2 text-xs rounded"
+                    placeholder="Ex: Prateleira B2, Gaveta 4"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <button onClick={() => setEditOpen(false)} className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded">Cancelar</button>
+                  <button onClick={handleSaveEdit} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded">Salvar Alterações</button>
                 </div>
               </div>
             </div>
